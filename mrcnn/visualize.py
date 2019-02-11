@@ -80,13 +80,13 @@ def apply_mask(image, mask, color, alpha=0.5):
     return image
 
 
-def display_instances(image, boxes, masks, class_ids, class_names,
+def display_instances(image, boxes,masks, class_ids, class_names,
                       scores=None, title="",
-                      figsize=(16, 16), ax=None,
+                      figsize=(16,16), ax=None,
                       show_mask=True, show_bbox=True,
                       colors=None, captions=None):
-    """
-    boxes: [num_instance, (y1, x1, y2, x2, class_id)] in image coordinates.
+    
+    '''boxes: [num_instance, (y1, x1, y2, x2, class_id)] in image coordinates.
     masks: [height, width, num_instances]
     class_ids: [num_instances]
     class_names: list of class names of the dataset
@@ -95,21 +95,22 @@ def display_instances(image, boxes, masks, class_ids, class_names,
     show_mask, show_bbox: To show masks and bounding boxes or not
     figsize: (optional) the size of the image
     colors: (optional) An array or colors to use with each object
-    captions: (optional) A list of strings to use as captions for each object
-    """
+    captions: (optional) A list of strings to use as captions for each object'''
+    
     # Number of instances
-    N = boxes.shape[0]
+    
+    N = masks.shape[-1]
     if not N:
         print("\n*** No instances to display *** \n")
     else:
         assert boxes.shape[0] == masks.shape[-1] == class_ids.shape[0]
-
+   
     # If no axis is passed, create one and automatically call show()
     auto_show = False
     if not ax:
-        _, ax = plt.subplots(1, figsize=figsize)
+        _, ax = plt.subplots(1,figsize = figsize)
         auto_show = True
-
+    
     # Generate random colors
     colors = colors or random_colors(N)
 
@@ -119,7 +120,7 @@ def display_instances(image, boxes, masks, class_ids, class_names,
     ax.set_xlim(-10, width + 10)
     ax.axis('off')
     ax.set_title(title)
-
+    
     masked_image = image.astype(np.uint32).copy()
     for i in range(N):
         color = colors[i]
@@ -140,13 +141,14 @@ def display_instances(image, boxes, masks, class_ids, class_names,
             class_id = class_ids[i]
             score = scores[i] if scores is not None else None
             label = class_names[class_id]
+            x = random.randint(x1, (x1 + x2) // 2)
             caption = "{} {:.3f}".format(label, score) if score else label
         else:
             caption = captions[i]
         ax.text(x1, y1 + 8, caption,
                 color='w', size=11, backgroundcolor="none")
 
-        # Mask
+         # Mask
         mask = masks[:, :, i]
         if show_mask:
             masked_image = apply_mask(masked_image, mask, color)
@@ -435,6 +437,7 @@ def draw_boxes(image, boxes=None, refined_boxes=None,
             # If there are refined boxes, display captions on them
             if refined_boxes is not None:
                 y1, x1, y2, x2 = ry1, rx1, ry2, rx2
+            x = random.randint(x1, (x1 + x2) // 2)
             ax.text(x1, y1, caption, size=11, verticalalignment='top',
                     color='w', backgroundcolor="none",
                     bbox={'facecolor': color, 'alpha': 0.5,

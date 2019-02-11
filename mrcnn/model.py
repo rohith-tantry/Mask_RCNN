@@ -526,6 +526,7 @@ def detection_targets_graph(proposals, gt_class_ids, gt_boxes, gt_masks, config)
     crowd_ix = tf.where(gt_class_ids < 0)[:, 0]
     non_crowd_ix = tf.where(gt_class_ids > 0)[:, 0]
     crowd_boxes = tf.gather(gt_boxes, crowd_ix)
+    crowd_masks = tf.gather(gt_masks, crowd_ix, axis=2)
     gt_class_ids = tf.gather(gt_class_ids, non_crowd_ix)
     gt_boxes = tf.gather(gt_boxes, non_crowd_ix)
     gt_masks = tf.gather(gt_masks, non_crowd_ix, axis=2)
@@ -1024,7 +1025,7 @@ def rpn_class_loss_graph(rpn_match, rpn_class_logits):
 
     rpn_match: [batch, anchors, 1]. Anchor match type. 1=positive,
                -1=negative, 0=neutral anchor.
-    rpn_class_logits: [batch, anchors, 2]. RPN classifier logits for BG/FG.
+    rpn_class_logits: [batch, anchors, 2]. RPN classifier logits for FG/BG.
     """
     # Squeeze last dim to simplify
     rpn_match = tf.squeeze(rpn_match, -1)
@@ -1211,13 +1212,13 @@ def load_image_gt(dataset, config, image_id, augment=False, augmentation=None,
     image = dataset.load_image(image_id)
     mask, class_ids = dataset.load_mask(image_id)
     original_shape = image.shape
-    image, window, scale, padding, crop = utils.resize_image(
+    image, window, scale, padding, _ = utils.resize_image(
         image,
         min_dim=config.IMAGE_MIN_DIM,
         min_scale=config.IMAGE_MIN_SCALE,
-        max_dim=config.IMAGE_MAX_DIM,
-        mode=config.IMAGE_RESIZE_MODE)
-    mask = utils.resize_mask(mask, scale, padding, crop)
+        max_dim=config.IMAGE_MAX_DIM
+        )
+    mask = utils.resize_mask(mask, scale, padding)
 
     # Random horizontal flips.
     # TODO: will be removed in a future update in favor of augmentation
@@ -1258,15 +1259,15 @@ def load_image_gt(dataset, config, image_id, augment=False, augmentation=None,
         # Change mask back to bool
         mask = mask.astype(np.bool)
 
-    # Note that some boxes might be all zeros if the corresponding mask got cropped out.
+    '''# Note that some boxes might be all zeros if the corresponding mask got cropped out.
     # and here is to filter them out
     _idx = np.sum(mask, axis=(0, 1)) > 0
     mask = mask[:, :, _idx]
-    class_ids = class_ids[_idx]
+    class_ids = class_ids[_idx]'''
     # Bounding boxes. Note that some boxes might be all zeros
     # if the corresponding mask got cropped out.
     # bbox: [num_instances, (y1, x1, y2, x2)]
-    bbox = utils.extract_bboxes(mask)
+    bbox = utils.extract_bboxes_from_labels(image_id, dataset, resize=True)
 
     # Active classes
     # Different datasets have different classes, so track the
@@ -1277,6 +1278,7 @@ def load_image_gt(dataset, config, image_id, augment=False, augmentation=None,
 
     # Resize masks to smaller size to reduce memory usage
     if use_mini_mask:
+       
         mask = utils.minimize_mask(bbox, mask, config.MINI_MASK_SHAPE)
 
     # Image meta data
@@ -1573,11 +1575,21 @@ def generate_random_rois(image_shape, count, gt_class_ids, gt_boxes):
         gt_y1, gt_x1, gt_y2, gt_x2 = gt_boxes[i]
         h = gt_y2 - gt_y1
         w = gt_x2 - gt_x1
-        # random boundaries
+       #print(gt_y1)
+       #print(gt_x1)
+       #print(gt_y2)
+       #print(gt_x2)
+       ## random boundaries
         r_y1 = max(gt_y1 - h, 0)
         r_y2 = min(gt_y2 + h, image_shape[0])
         r_x1 = max(gt_x1 - w, 0)
         r_x2 = min(gt_x2 + w, image_shape[1])
+        #print(r_y1)
+        #print(r_y2)
+        #print(r_x1)
+        #print(r_x2)
+
+        
 
         # To avoid generating boxes with zero area, we generate double what
         # we need and filter out the extra. If we get fewer valid boxes

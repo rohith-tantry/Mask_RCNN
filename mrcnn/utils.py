@@ -55,6 +55,57 @@ def extract_bboxes(mask):
         boxes[i] = np.array([y1, x1, y2, x2])
     return boxes.astype(np.int32)
 
+def extract_bboxes_from_labels(image_id, dataset, resize = False):
+    """Compute bounding boxes from masks.
+    mask: [height, width, num_instances]. Mask pixels are either 1 or 0.
+
+    Returns: bbox array [num_instances, (y1, x1, y2, x2)].
+    
+    """
+    info = dataset.image_info[image_id]
+    
+    boxes = np.zeros([len(info['b_boxes']), 4], dtype=np.int32)
+    for n,i in enumerate(info['b_boxes']):
+      
+        # Bounding box.
+        horizontal_indicies = np.array([i['top_left'][1],i['bottom_right'][1]])
+        vertical_indicies = np.array([i['top_left'][0],i['bottom_right'][0]])
+      
+        x1, x2 = horizontal_indicies[[0, -1]]
+        y1, y2 = vertical_indicies[[0, -1]]
+
+        #x1 = max(0,x1)
+        #x2 = min(960,x2)
+        #y1 = max(0,y1)
+        #y2 = min(540,y2)
+       
+        
+        # x2 and y2 should not be part of the box. Increment by 1.
+        #x2 += 1
+        #y2 += 1
+        if resize:
+            y1, y2 = y1+210 , y2+210
+        boxes[n] = np.array([y1, x1, y2, x2])
+    return boxes.astype(np.int32)
+
+def extract_bboxes_from_mask(mask):
+    import cv2
+    from skimage.io import imread
+    from skimage.segmentation import  mark_boundaries
+    from skimage.measure import label, regionprops
+    from skimage.util.montage import montage2d as montage
+    montage_rgb = lambda x: np.stack([montage(x[:,:,:,i]) for i in range(x.shape[3])],-1)
+    from skimage.morphology import label
+    lbl_0 = label(mask)
+    props = regionprops(lbl_0)
+    bbox = []
+    
+    for prop in props:
+        bbox.append(list(prop.bbox))
+        
+    boxes = np.array(bbox)
+    return boxes.astype(np.int32)
+
 
 def compute_iou(box, boxes, box_area, boxes_area):
     """Calculates IoU of the given box with the array of the given boxes.
@@ -524,6 +575,7 @@ def minimize_mask(bbox, mask, mini_shape):
         m = mask[:, :, i].astype(bool)
         y1, x1, y2, x2 = bbox[i][:4]
         m = m[y1:y2, x1:x2]
+      
         if m.size == 0:
             raise Exception("Invalid bounding box with area of zero")
         # Resize with bilinear interpolation
